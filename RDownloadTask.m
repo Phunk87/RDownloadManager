@@ -9,7 +9,16 @@
 #import "RDownloadTask.h"
 
 #define kRDownloadTaskDefaultCacheSize 128
-#define kRDownloadTaskDefaultDirectory @"Downloads"
+#define kRDownloadTaskDefaultDirectory @"RDownloads"
+
+#define kRDownloadTaskKeyUID @"UID"
+#define kRDownloadTaskKeyURL @"URL"
+#define kRDownloadTaskKeyUserAgent @"USER_AGENT"
+#define kRDownloadTaskKeyCookie @"COOKIE"
+#define kRDownloadTaskKeySavePath @"SAVE_PATH"
+#define kRDownloadTaskKeyDownloadedBytes @"DOWNLOADED_BYTES"
+#define kRDownloadTaskKeyTotalBytes @"TOTAL_BYTES"
+#define kRDownloadTaskKeyStatus @"STATUS"
 
 @interface RDownloadTask()
 
@@ -21,7 +30,6 @@
 - (void)prepareDownload;
 - (void)startDownload;
 - (void)pauseDownload;
-- (void)cancelDownload;
 
 @end
 
@@ -31,8 +39,8 @@
 
 - (NSString *)defaultDirectory
 {
-    NSArray *paths = NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES);
-    NSString *documentDirectory = [paths objectAtIndex:0];
+    NSArray *documentPaths = NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES);
+    NSString *documentDirectory = documentPaths[0];
     return [documentDirectory stringByAppendingPathComponent:kRDownloadTaskDefaultDirectory];
 }
 
@@ -90,6 +98,9 @@
     [self.connection start];
     
     self.status = RDownloadTaskStatusPending;
+    if ([self.delegate respondsToSelector:@selector(downloadTaskDidStart:)]) {
+        [self.delegate downloadTaskDidStart:self];
+    }
 }
 
 - (void)pauseDownload
@@ -97,6 +108,9 @@
     [self.connection cancel];
     [self writeCacheToFile];
     self.status = RDownloadTaskStatusPaused;
+    if ([self.delegate respondsToSelector:@selector(downloadTaskDidPause:)]) {
+        [self.delegate downloadTaskDidPause:self];
+    }
 }
 
 #pragma mark - Life cycle
@@ -106,6 +120,50 @@
     self = [super init];
     if (self) {
         
+    }
+    return self;
+}
+
+- (id)initWithURL:(NSURL *)url saveToPath:(NSString *)savePath
+{
+    self = [self init];
+    if (self) {
+        self.url = url;
+        self.savePath = savePath;
+    }
+    return self;
+}
+
+#pragma mark - NSCoding
+
+- (void)encodeWithCoder:(NSCoder *)aCoder
+{
+    [aCoder encodeObject:_uid forKey:kRDownloadTaskKeyUID];
+    [aCoder encodeObject:_url forKey:kRDownloadTaskKeyURL];
+    [aCoder encodeObject:_userAgent forKey:kRDownloadTaskKeyUserAgent];
+    [aCoder encodeObject:_cookie forKey:kRDownloadTaskKeyCookie];
+    [aCoder encodeObject:_savePath forKey:kRDownloadTaskKeySavePath];
+    [aCoder encodeInteger:_status forKey:kRDownloadTaskKeyStatus];
+    if (_status == RDownloadTaskStatusPaused) {
+        [aCoder encodeInt64:_downloadedBytes forKey:kRDownloadTaskKeyDownloadedBytes];
+        [aCoder encodeInt64:_totalBytes forKey:kRDownloadTaskKeyTotalBytes];
+    }
+}
+
+- (id)initWithCoder:(NSCoder *)aDecoder
+{
+    self = [self init];
+    if (self) {
+        self.uid = [aDecoder decodeObjectForKey:kRDownloadTaskKeyUID];
+        self.url = [aDecoder decodeObjectForKey:kRDownloadTaskKeyURL];
+        self.userAgent = [aDecoder decodeObjectForKey:kRDownloadTaskKeyUserAgent];
+        self.cookie = [aDecoder decodeObjectForKey:kRDownloadTaskKeyCookie];
+        self.savePath = [aDecoder decodeObjectForKey:kRDownloadTaskKeySavePath];
+        self.status = [aDecoder decodeIntegerForKey:kRDownloadTaskKeyStatus];
+        if (_status == RDownloadTaskStatusPaused) {
+            self.downloadedBytes = [aDecoder decodeInt64ForKey:kRDownloadTaskKeyDownloadedBytes];
+            self.totalBytes = [aDecoder decodeInt64ForKey:kRDownloadTaskKeyTotalBytes];
+        }
     }
     return self;
 }

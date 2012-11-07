@@ -6,13 +6,20 @@
 //  Copyright (c) 2012 Seymour Dev. All rights reserved.
 //
 
+#import "RDownloadTask.h"
 #import "RDownloadManager.h"
-#import "RDownloadTask.m"
+
+#define kRDownloadManagerSaveFileName @"RDownloadManager.plist"
+#define kRDownloadManagerKeyTaskList @"TASK_LIST"
 
 @interface RDownloadManager()
 
 @property (nonatomic, strong) NSMutableArray *taskList;
 @property (nonatomic, strong) NSOperationQueue *downloadQueue;
+
+- (NSString *)pathForSaveFile;
+- (void)readTaskList;
+- (void)saveTaskList;
 
 @end
 
@@ -20,9 +27,41 @@
 
 #pragma mark - Data storage
 
+- (NSString *)pathForSaveFile
+{
+    NSArray *documentPaths = NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES);
+    NSString *documentDirectory = documentPaths[0];
+    NSString *filePath = [documentDirectory stringByAppendingPathComponent:kRDownloadManagerSaveFileName];
+    return filePath;
+}
+
 - (void)readTaskList
 {
-    
+    [self.downloadQueue cancelAllOperations];
+    [self.taskList removeAllObjects];
+    NSString *pathForSaveFile = self.pathForSaveFile;
+    if ([[NSFileManager defaultManager] fileExistsAtPath:pathForSaveFile]) {
+        NSData *taskListData = [[[NSData alloc] initWithContentsOfFile:pathForSaveFile] autorelease];
+        NSKeyedUnarchiver *unarchiver = [[[NSKeyedUnarchiver alloc] initForReadingWithData:taskListData] autorelease];
+        NSArray *taskList = [unarchiver decodeObjectForKey:kRDownloadManagerKeyTaskList];
+        [unarchiver finishDecoding];
+        [self.taskList addObjectsFromArray:taskList];
+    }
+    for (RDownloadTask *task in _taskList) {
+        if (task.status != RDownloadTaskStatusDownloaded) {
+            [_downloadQueue addOperation:task];
+        }
+    }
+}
+
+- (void)saveTaskList
+{
+    NSString *pathForSaveFile = self.pathForSaveFile;
+    NSMutableData *taskListData = [[[NSMutableData alloc] init] autorelease];
+    NSKeyedArchiver *archiver = [[[NSKeyedArchiver alloc] initForWritingWithMutableData:taskListData] autorelease];
+    [archiver encodeObject:_taskList forKey:kRDownloadManagerKeyTaskList];
+    [archiver finishEncoding];
+    [taskListData writeToFile:pathForSaveFile atomically:NO];
 }
 
 #pragma mark - Task control
@@ -47,6 +86,7 @@
 
 - (void)removeTask:(RDownloadTask *)task
 {
+    [[NSFileManager defaultManager] removeItemAtPath:task.savePath error:NULL];
     [self stopTask:task];
     [_taskList removeObject:task];
 }
