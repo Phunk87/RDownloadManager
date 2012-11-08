@@ -13,6 +13,7 @@
 
 @optional
 - (void)downloadTaskDidStart:(RDownloadTask *)downloadTask;
+- (void)downloadTaskDidReceiveData:(RDownloadTask *)downloadTask;
 - (void)downloadTaskDidPause:(RDownloadTask *)downloadTask;
 - (void)downloadTaskDidFinishDownload:(RDownloadTask *)downloadTask;
 - (void)downloadTask:(RDownloadTask *)downloadTask didFailWithError:(NSError *)error;
@@ -22,9 +23,7 @@
 @interface RDownloadTask : NSOperation <NSCoding, NSURLConnectionDataDelegate>
 
 typedef enum {
-    RDownloadTaskStatusDefault = 0,
     RDownloadTaskStatusPaused,
-    RDownloadTaskStatusPending,
     RDownloadTaskStatusDownloading,
     RDownloadTaskStatusDownloaded,
     RDownloadTaskStatusFailed
@@ -54,7 +53,7 @@ typedef enum {
 @property (assign) int64_t cacheSize; // Bytes
 
 // Status
-@property (assign) RDownloadTaskStatus status;
+@property (nonatomic, assign) RDownloadTaskStatus status;
 @property (readonly) float progress;
 
 - (id)initWithURL:(NSURL *)url saveToPath:(NSString *)savePath;

@@ -7,11 +7,11 @@
 //
 
 #import <Foundation/Foundation.h>
-
-@class RDownloadTask;
+#import "RDownloadTask.h"
 
 @interface RDownloadManager : NSObject
 
+@property (nonatomic, strong) NSMutableArray *taskList;
 @property (nonatomic, assign) NSUInteger maxConcurrentDownloadTaskCount;
 
 + (RDownloadManager *)shared;

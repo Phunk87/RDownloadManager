@@ -6,7 +6,6 @@
 //  Copyright (c) 2012 Seymour Dev. All rights reserved.
 //
 
-#import "RDownloadTask.h"
 #import "RDownloadManager.h"
 
 #define kRDownloadManagerSaveFileName @"RDownloadManager.plist"
@@ -14,7 +13,6 @@
 
 @interface RDownloadManager()
 
-@property (nonatomic, strong) NSMutableArray *taskList;
 @property (nonatomic, strong) NSOperationQueue *downloadQueue;
 
 - (NSString *)pathForSaveFile;
@@ -111,6 +109,7 @@ static RDownloadManager *sharedRDownloadManager = nil;
 {
     if (!sharedRDownloadManager) {
         sharedRDownloadManager = [[RDownloadManager alloc] init];
+        [sharedRDownloadManager readTaskList];
     }
     return sharedRDownloadManager;
 }
@@ -121,6 +120,7 @@ static RDownloadManager *sharedRDownloadManager = nil;
     if (self) {
         self.taskList = [[[NSMutableArray alloc] init] autorelease];
         self.downloadQueue = [[[NSOperationQueue alloc] init] autorelease];
+        _downloadQueue.maxConcurrentOperationCount = 3;
     }
     return self;
 }

@@ -8,8 +8,9 @@
 
 #import "RDownloadTask.h"
 
-#define kRDownloadTaskDefaultCacheSize 128
+#define kRDownloadTaskDefaultCacheSize (4 * 1024 * 1024)
 #define kRDownloadTaskDefaultDirectory @"RDownloads"
+#define kRDownloadTaskDownloadingPathExtension @"downloading"
 
 #define kRDownloadTaskKeyUID @"UID"
 #define kRDownloadTaskKeyURL @"URL"
@@ -35,6 +36,16 @@
 
 @implementation RDownloadTask
 
+#pragma mark - Status
+
+- (float)progress
+{
+    if (_totalBytes) {
+        return _downloadedBytes * 1.0f / _totalBytes;
+    }
+    return 0;
+}
+
 #pragma mark - Data control
 
 - (NSString *)defaultDirectory
@@ -49,7 +60,7 @@
     // Get last component and remove parameters
     NSString *urlString = self.url.absoluteString;
     NSUInteger dividerLoc = [urlString rangeOfString:@"?"].location;
-    NSString *fileName = [urlString.lastPathComponent substringToIndex:(dividerLoc==NSNotFound?urlString.length:dividerLoc)];
+    NSString *fileName = [[urlString substringToIndex:(dividerLoc==NSNotFound?urlString.length:dividerLoc)] lastPathComponent];
     return [self.defaultDirectory stringByAppendingString:fileName];
 }
 
@@ -70,17 +81,36 @@
 
 - (void)prepareDownload
 {
-    if (!_savePath) {
-        self.savePath = self.defaultPath;
-    }
     if (!_cacheSize) {
         self.cacheSize = kRDownloadTaskDefaultCacheSize;
     }
+    if (!_downloadedBytes) {
+        if (!_savePath) {
+            self.savePath = self.defaultPath;
+        }
+        NSString *downloadingPath = [_savePath stringByAppendingPathExtension:@"downloading"];
+        NSFileManager *fileManager = [NSFileManager defaultManager];
+        if ([fileManager fileExistsAtPath:_savePath] ||
+            [fileManager fileExistsAtPath:downloadingPath]) {
+            for (NSInteger i = 1; i; i++) {
+                // Add a number before file extension
+                NSString *newPath = [[NSString stringWithFormat:@"%@.%d", [_savePath stringByDeletingPathExtension], i] stringByAppendingPathExtension:_savePath.pathExtension];
+                downloadingPath = [newPath stringByAppendingPathExtension:@"downloading"];
+                if (![fileManager fileExistsAtPath:newPath] &&
+                    ![fileManager fileExistsAtPath:downloadingPath]) {
+                    break;
+                }
+            }
+        }
+        self.savePath = downloadingPath;
+    }
+    [[NSFileManager defaultManager] createFileAtPath:_savePath contents:nil attributes:nil];
 }
 
 - (void)startDownload
 {
     [self prepareDownload];
+    
     NSMutableURLRequest *request = [[[NSMutableURLRequest alloc] initWithURL:self.url
                                                                  cachePolicy:NSURLRequestReloadIgnoringLocalAndRemoteCacheData
                                                              timeoutInterval:10] autorelease];
@@ -97,9 +127,13 @@
     self.connection = [NSURLConnection connectionWithRequest:request delegate:self];
     [self.connection start];
     
-    self.status = RDownloadTaskStatusPending;
+    self.status = RDownloadTaskStatusDownloading;
     if ([self.delegate respondsToSelector:@selector(downloadTaskDidStart:)]) {
         [self.delegate downloadTaskDidStart:self];
+    }
+    
+    while (!self.isFinished) {
+        [[NSRunLoop currentRunLoop] runMode:NSDefaultRunLoopMode beforeDate:[NSDate distantFuture]];
     }
 }
 
@@ -144,7 +178,8 @@
     [aCoder encodeObject:_cookie forKey:kRDownloadTaskKeyCookie];
     [aCoder encodeObject:_savePath forKey:kRDownloadTaskKeySavePath];
     [aCoder encodeInteger:_status forKey:kRDownloadTaskKeyStatus];
-    if (_status == RDownloadTaskStatusPaused) {
+    if (_status == RDownloadTaskStatusPaused ||
+        _status == RDownloadTaskStatusDownloading) {
         [aCoder encodeInt64:_downloadedBytes forKey:kRDownloadTaskKeyDownloadedBytes];
         [aCoder encodeInt64:_totalBytes forKey:kRDownloadTaskKeyTotalBytes];
     }
@@ -160,7 +195,8 @@
         self.cookie = [aDecoder decodeObjectForKey:kRDownloadTaskKeyCookie];
         self.savePath = [aDecoder decodeObjectForKey:kRDownloadTaskKeySavePath];
         self.status = [aDecoder decodeIntegerForKey:kRDownloadTaskKeyStatus];
-        if (_status == RDownloadTaskStatusPaused) {
+        if (_status == RDownloadTaskStatusPaused ||
+            _status == RDownloadTaskStatusDownloading) {
             self.downloadedBytes = [aDecoder decodeInt64ForKey:kRDownloadTaskKeyDownloadedBytes];
             self.totalBytes = [aDecoder decodeInt64ForKey:kRDownloadTaskKeyTotalBytes];
         }
@@ -180,11 +216,6 @@
     [self pauseDownload];
 }
 
-- (BOOL)isReady
-{
-    return (_status == RDownloadTaskStatusPending);
-}
-
 - (BOOL)isConcurrent
 {
     return YES;
@@ -197,7 +228,8 @@
 
 - (BOOL)isFinished
 {
-    return (_status == RDownloadTaskStatusDownloaded ||
+    return (_status == RDownloadTaskStatusPaused ||
+            _status == RDownloadTaskStatusDownloaded ||
             _status == RDownloadTaskStatusFailed);
 }
 
@@ -211,6 +243,9 @@
             self.cacheData = [NSMutableData data];
         }
         self.status = RDownloadTaskStatusDownloading;
+        if (!_totalBytes) {
+            _totalBytes = [[[(NSHTTPURLResponse *)response allHeaderFields] objectForKey:@"Content-Length"] intValue];
+        }
     } else {
         self.status = RDownloadTaskStatusFailed;
         if ([self.delegate respondsToSelector:@selector(downloadTask:didFailWithError:)]) {
@@ -222,15 +257,22 @@
 - (void)connection:(NSURLConnection *)connection didReceiveData:(NSData *)data
 {
     [self.cacheData appendData:data];
+    self.status = RDownloadTaskStatusDownloading;
     self.downloadedBytes += data.length;
     if (_downloadedBytes >= _cacheSize) {
         [self writeCacheToFile];
+    }
+    if ([self.delegate respondsToSelector:@selector(downloadTaskDidReceiveData:)]) {
+        [self.delegate downloadTaskDidReceiveData:self];
     }
 }
 
 - (void)connectionDidFinishLoading:(NSURLConnection *)connection
 {
     [self writeCacheToFile];
+    NSString *newPath = [_savePath stringByDeletingPathExtension];
+    [[NSFileManager defaultManager] moveItemAtPath:_savePath toPath:newPath error:NULL];
+    self.savePath = newPath;
     self.status = RDownloadTaskStatusDownloaded;
     if ([self.delegate respondsToSelector:@selector(downloadTaskDidFinishDownload:)]) {
         [self.delegate downloadTaskDidFinishDownload:self];
