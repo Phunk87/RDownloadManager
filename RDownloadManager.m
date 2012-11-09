@@ -47,7 +47,7 @@
     }
     for (RDownloadTask *task in _taskList) {
         if (task.status != RDownloadTaskStatusDownloaded) {
-            [_downloadQueue addOperation:task];
+            [self pendTask:task];
         }
     }
 }
@@ -67,6 +67,7 @@
 - (void)addTask:(RDownloadTask *)task startImmediately:(BOOL)startImmediately
 {
     [_taskList addObject:task];
+    [self saveTaskList];
     if (startImmediately) {
         [self pendTask:task];
     }
@@ -74,6 +75,9 @@
 
 - (void)pendTask:(RDownloadTask *)task
 {
+    [task setCompletionBlock:^{
+        [self saveTaskList];
+    }];
     [_downloadQueue addOperation:task];
 }
 
@@ -87,6 +91,7 @@
     [[NSFileManager defaultManager] removeItemAtPath:task.savePath error:NULL];
     [self stopTask:task];
     [_taskList removeObject:task];
+    [self saveTaskList];
 }
 
 #pragma mark - Getters & setters
