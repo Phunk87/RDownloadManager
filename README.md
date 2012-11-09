@@ -36,8 +36,8 @@ You can support me in various ways: Cash donation, purchasing items on Amazon Wi
 您可以通过多种方式支持我: 捐赠, 为我购买亚马逊心愿单上的物品, 或尽您所能改善我的代码并提交 pull request.
 
 Via:
-[Alipay | 支付宝](https://me.alipay.com/alexrezit)
-[Amazon Wishlist | 亚马逊心愿单](http://www.amazon.cn/wishlist/P8YMPIX8QFTN/)
+* [Alipay | 支付宝](https://me.alipay.com/alexrezit)
+* [Amazon Wishlist | 亚马逊心愿单](http://www.amazon.cn/wishlist/P8YMPIX8QFTN/)
 
 ## RDownloadManager Class Reference
 
