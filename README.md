@@ -50,17 +50,17 @@ RDownloadManager is the manager that controls all download task operations.
 
 #### Getting the Shared RDownloadManager Instance
 
-```+ shared```
+`+ shared`
 
 #### Perform an Operation to a RDownloadTask Instance
 
-```- addTask:startImmediately:```
+`- addTask:startImmediately:`
 
-```- queueTask:```
+`- queueTask:`
 
-```- stopTask:```
+`- stopTask:`
 
-```- removeTask:```
+`- removeTask:`
 
 
 ### Properties
@@ -69,21 +69,21 @@ RDownloadManager is the manager that controls all download task operations.
 
 An array containing all the tasks.
 
-```@property (nonatomic, strong) NSMutableArray *taskList```
+`@property (nonatomic, strong) NSMutableArray *taskList`
 
 ##### Decalred In
 
-```RDownloadManager.h```
+`RDownloadManager.h`
 
 #### maxConcurrentDownloadTaskCount
 
 The max number of concurrent download tasks.
 
-```@property (nonatomic, assign) NSUInteger maxConcurrentDownloadTaskCount```
+`@property (nonatomic, assign) NSUInteger maxConcurrentDownloadTaskCount`
 
 ##### Decalred In
 
-```RDownloadManager.h```
+`RDownloadManager.h`
 
 
 ### Class Methods
@@ -91,13 +91,13 @@ The max number of concurrent download tasks.
 #### shared
 
 Returns the shared RDownloadManager object.
-```+ (RDownloadManager *)shared```
+`+ (RDownloadManager *)shared`
 
 ##### Return Value
 The shared RDownloadManager object.
 
 ##### Declared In
-```RDownloadManager.h```
+`RDownloadManager.h`
 
 ### Instance Methods
 
@@ -105,7 +105,7 @@ The shared RDownloadManager object.
 
 Add a task to list and queue it, if specified.
 
-```- (void)addTask:(RDownloadTask *)task startImmediately:(BOOL)startImmediately```
+`- (void)addTask:(RDownloadTask *)task startImmediately:(BOOL)startImmediately`
 
 ##### Parameters
 
@@ -113,52 +113,52 @@ _task_
 > The task to add.
 
 _startImmediately_
-> ```YES``` if the task should be start immediately, otherwise ```NO```. If you pass ```NO```, the task will be added to list but not to the queue. You can start it later by calling ```queueTask:```.
+> `YES` if the task should be start immediately, otherwise `NO`. If you pass `NO`, the task will be added to list but not to the queue. You can start it later by calling `queueTask:`.
 
 ##### Decalred In
-```RDownloadManager.h```
+`RDownloadManager.h`
 
 #### queueTask:
 
 Add a task to operation queue.
 
-```- (void)queueTask:(RDownloadTask *)task```
+`- (void)queueTask:(RDownloadTask *)task`
 
 ##### Parameters
 _task_  
 > The task to queue.
 
 ##### Decalred In
-```RDownloadManager.h```
+`RDownloadManager.h`
 
 #### stopTask:
 
 Stop a task.
 
-```- (void)stopTask:(RDownloadTask *)task```
+`- (void)stopTask:(RDownloadTask *)task`
 
 ##### Parameters
 _task_  
 > The task to stop.
 
 ##### Special Considerations
-This method only pause a task by cancel the operation. If you want to remove it, call ```removeTask:``` instead.
+This method only pause a task by cancel the operation. If you want to remove it, call `removeTask:` instead.
 
 ##### Decalred In
-```RDownloadManager.h```
+`RDownloadManager.h`
 
 #### removeTask:
 
 Remove a task, and delete the local file. If the task is executing, it will stop first, and then be removed.
 
-```- (void)removeTask:(RDownloadTask *)task```
+`- (void)removeTask:(RDownloadTask *)task`
 
 ##### Parameters
 _task_  
 > The task to remove.
 
 ##### Decalred In
-```RDownloadManager.h```
+`RDownloadManager.h`
 
 ## RDownloadTask Class Reference
 
@@ -169,7 +169,7 @@ RDownloadTask is a download task.
 ### Tasks
 
 #### Initializing a RDownloadTask Object
-```- (id)initWithURL:(NSURL *)url saveToPath:(NSString *)savePath```
+`- (id)initWithURL:(NSURL *)url saveToPath:(NSString *)savePath`
 
 ### Properties
 
