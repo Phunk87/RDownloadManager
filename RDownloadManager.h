@@ -16,7 +16,7 @@
 
 + (RDownloadManager *)shared;
 - (void)addTask:(RDownloadTask *)task startImmediately:(BOOL)startImmediately;
-- (void)pendTask:(RDownloadTask *)task;
+- (void)queueTask:(RDownloadTask *)task;
 - (void)stopTask:(RDownloadTask *)task;
 - (void)removeTask:(RDownloadTask *)task;
 

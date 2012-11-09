@@ -47,7 +47,7 @@
     }
     for (RDownloadTask *task in _taskList) {
         if (task.status != RDownloadTaskStatusDownloaded) {
-            [self pendTask:task];
+            [self queueTask:task];
         }
     }
 }
@@ -69,11 +69,11 @@
     [_taskList addObject:task];
     [self saveTaskList];
     if (startImmediately) {
-        [self pendTask:task];
+        [self queueTask:task];
     }
 }
 
-- (void)pendTask:(RDownloadTask *)task
+- (void)queueTask:(RDownloadTask *)task
 {
     [task setCompletionBlock:^{
         [self saveTaskList];
