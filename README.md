@@ -13,7 +13,7 @@ task.uid = @"123456"; // Set some uid
 task.userAgent = @"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_8_2) AppleWebKit/536.26.17 (KHTML, like Gecko) Version/6.0.2 Safari/536.26.17"; // Use a user agent
 task.cookie = @"some cookie"; // Use cookie
 task.savePath = @"~/Downloads"; // Save it to "~/Downloads"
-task.cacheSize = 16 * 1024 * 1024; // Set cache size to 16MB
+task.cacheSize = 16 * 1024 * 1024; // Set cache size to 16MB (512KB as default)
 ```
 
 ### Control a task 对任务进行操作
@@ -24,6 +24,16 @@ sharedDownloadManager.maxConcurrentDownloadTaskCount = 5;
 [sharedDownloadManager queueTask:task];
 [sharedDownloadManager stopTask:task];
 [sharedDownloadManager removeTask:task];
+```
+
+### Delegate
+```
+- (void)downloadTask:(RDownloadTask *)downloadTask didChangeStatus:(RDownloadTaskStatus)status;
+- (void)downloadTaskDidStart:(RDownloadTask *)downloadTask;
+- (void)downloadTaskDidReceiveData:(RDownloadTask *)downloadTask;
+- (void)downloadTaskDidPause:(RDownloadTask *)downloadTask;
+- (void)downloadTaskDidFinishDownload:(RDownloadTask *)downloadTask;
+- (void)downloadTask:(RDownloadTask *)downloadTask didFailWithError:(NSError *)error;
 ```
 
 ## License 许可
