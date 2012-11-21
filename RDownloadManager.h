@@ -19,5 +19,9 @@
 - (void)queueTask:(RDownloadTask *)task;
 - (void)stopTask:(RDownloadTask *)task;
 - (void)removeTask:(RDownloadTask *)task;
+- (void)removeAllTasks;
+
+- (BOOL)hasTaskWithUID:(NSString *)uid;
+- (BOOL)hasDownloadedTaskWithUID:(NSString *)uid;
 
 @end

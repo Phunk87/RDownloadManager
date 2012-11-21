@@ -23,6 +23,31 @@
 
 @implementation RDownloadManager
 
+#pragma mark - Task status
+
+- (BOOL)hasTaskWithUID:(NSString *)uid
+{
+    for (RDownloadTask *task in self.taskList) {
+        if ([task.uid isEqualToString:uid]) {
+            return YES;
+        }
+    }
+    return NO;
+}
+
+- (BOOL)hasDownloadedTaskWithUID:(NSString *)uid
+{
+    for (RDownloadTask *task in self.taskList) {
+        if ([task.uid isEqualToString:uid]) {
+            if (task.status == RDownloadTaskStatusDownloaded) {
+                return YES;
+            }
+            return NO;
+        }
+    }
+    return NO;
+}
+
 #pragma mark - Data storage
 
 - (NSString *)pathForSaveFile
@@ -57,7 +82,9 @@
     NSString *pathForSaveFile = self.pathForSaveFile;
     NSMutableData *taskListData = [[[NSMutableData alloc] init] autorelease];
     NSKeyedArchiver *archiver = [[[NSKeyedArchiver alloc] initForWritingWithMutableData:taskListData] autorelease];
-    [archiver encodeObject:_taskList forKey:kRDownloadManagerKeyTaskList];
+    NSArray *taskList = [_taskList copy];
+    [archiver encodeObject:taskList forKey:kRDownloadManagerKeyTaskList];
+    [taskList release];
     [archiver finishEncoding];
     [taskListData writeToFile:pathForSaveFile atomically:NO];
 }
@@ -75,23 +102,39 @@
 
 - (void)queueTask:(RDownloadTask *)task
 {
-    [task setCompletionBlock:^{
+    task.status = RDownloadTaskStatusWaiting;
+    RDownloadOperation *operation = [[[RDownloadOperation alloc] initWithDownloadTask:task] autorelease];
+    [operation setCompletionBlock:^{
         [self saveTaskList];
     }];
-    [_downloadQueue addOperation:task];
+    [_downloadQueue addOperation:operation];
 }
 
 - (void)stopTask:(RDownloadTask *)task
 {
-    [task cancel];
+    if (task.status == RDownloadTaskStatusDownloading) {
+        [task.operation cancel];
+    }
 }
 
 - (void)removeTask:(RDownloadTask *)task
 {
     [[NSFileManager defaultManager] removeItemAtPath:task.savePath error:NULL];
     [self stopTask:task];
+    if (task.status == RDownloadTaskStatusDownloading) {
+    }
     [_taskList removeObject:task];
     [self saveTaskList];
+}
+
+- (void)removeAllTasks
+{
+    [self.downloadQueue cancelAllOperations];
+    for (RDownloadTask *task in self.taskList) {
+        [[NSFileManager defaultManager] removeItemAtPath:task.savePath error:NULL];
+    }
+    [self.taskList removeAllObjects];
+    [[NSFileManager defaultManager] removeItemAtPath:self.pathForSaveFile error:NULL];
 }
 
 #pragma mark - Getters & setters

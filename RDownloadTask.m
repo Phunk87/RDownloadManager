@@ -8,7 +8,7 @@
 
 #import "RDownloadTask.h"
 
-#define kRDownloadTaskDefaultCacheSize (4 * 1024 * 1024)
+#define kRDownloadTaskDefaultCacheSize (512 * 1024)
 #define kRDownloadTaskDefaultDirectory @"RDownloads"
 #define kRDownloadTaskDownloadingPathExtension @"downloading"
 
@@ -31,12 +31,21 @@
 - (void)prepareDownload;
 - (void)startDownload;
 - (void)pauseDownload;
+- (void)resetDownload;
 
 @end
 
 @implementation RDownloadTask
 
 #pragma mark - Status
+
+- (void)setStatus:(RDownloadTaskStatus)status
+{
+    if ([self.delegate respondsToSelector:@selector(downloadTask:didChangeStatus:)]) {
+        [self.delegate downloadTask:self didChangeStatus:status];
+    }
+    _status = status;
+}
 
 - (float)progress
 {
@@ -52,7 +61,13 @@
 {
     NSArray *documentPaths = NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES);
     NSString *documentDirectory = documentPaths[0];
-    return [documentDirectory stringByAppendingPathComponent:kRDownloadTaskDefaultDirectory];
+    NSString *defaultDirectory = [documentDirectory stringByAppendingPathComponent:kRDownloadTaskDefaultDirectory];
+    NSFileManager *fileManager = [NSFileManager defaultManager];
+    if (![fileManager fileExistsAtPath:defaultDirectory]) {
+        [fileManager removeItemAtPath:defaultDirectory error:NULL];
+        [fileManager createDirectoryAtPath:defaultDirectory withIntermediateDirectories:NO attributes:nil error:NULL];
+    }
+    return defaultDirectory;
 }
 
 - (NSString *)defaultPath
@@ -61,7 +76,7 @@
     NSString *urlString = self.url.absoluteString;
     NSUInteger dividerLoc = [urlString rangeOfString:@"?"].location;
     NSString *fileName = [[urlString substringToIndex:(dividerLoc==NSNotFound?urlString.length:dividerLoc)] lastPathComponent];
-    return [self.defaultDirectory stringByAppendingString:fileName];
+    return [self.defaultDirectory stringByAppendingPathComponent:fileName];
 }
 
 - (void)writeCacheToFile
@@ -104,11 +119,13 @@
         }
         self.savePath = downloadingPath;
     }
-    [[NSFileManager defaultManager] createFileAtPath:_savePath contents:nil attributes:nil];
 }
 
 - (void)startDownload
 {
+    if (_status == RDownloadTaskStatusFailed) {
+        [self resetDownload];
+    }
     [self prepareDownload];
     
     NSMutableURLRequest *request = [[[NSMutableURLRequest alloc] initWithURL:self.url
@@ -131,20 +148,29 @@
     if ([self.delegate respondsToSelector:@selector(downloadTaskDidStart:)]) {
         [self.delegate downloadTaskDidStart:self];
     }
-    
-    while (!self.isFinished) {
-        [[NSRunLoop currentRunLoop] runMode:NSDefaultRunLoopMode beforeDate:[NSDate distantFuture]];
-    }
 }
 
 - (void)pauseDownload
 {
     [self.connection cancel];
+    self.connection = nil;
     [self writeCacheToFile];
     self.status = RDownloadTaskStatusPaused;
     if ([self.delegate respondsToSelector:@selector(downloadTaskDidPause:)]) {
         [self.delegate downloadTaskDidPause:self];
     }
+}
+
+- (void)resetDownload
+{
+    [self.connection cancel];
+    [[NSFileManager defaultManager] removeItemAtPath:self.savePath error:NULL];
+    if ([_savePath.pathExtension isEqualToString:kRDownloadTaskDownloadingPathExtension]) {
+        self.savePath = _savePath.stringByDeletingPathExtension;
+    }
+    self.cacheData.length = 0;
+    self.downloadedBytes = 0;
+    self.totalBytes = 0;
 }
 
 #pragma mark - Life cycle
@@ -204,35 +230,6 @@
     return self;
 }
 
-#pragma mark - Concurrent operation override
-
-- (void)start
-{
-    [self startDownload];
-}
-
-- (void)cancel
-{
-    [self pauseDownload];
-}
-
-- (BOOL)isConcurrent
-{
-    return YES;
-}
-
-- (BOOL)isExecuting
-{
-    return (_status == RDownloadTaskStatusDownloading);
-}
-
-- (BOOL)isFinished
-{
-    return (_status == RDownloadTaskStatusPaused ||
-            _status == RDownloadTaskStatusDownloaded ||
-            _status == RDownloadTaskStatusFailed);
-}
-
 #pragma mark - URL connection download delegate
 
 - (void)connection:(NSURLConnection *)connection didReceiveResponse:(NSURLResponse *)response
@@ -242,11 +239,11 @@
         if (!_cacheData) {
             self.cacheData = [NSMutableData data];
         }
-        self.status = RDownloadTaskStatusDownloading;
         if (!_totalBytes) {
             _totalBytes = [[[(NSHTTPURLResponse *)response allHeaderFields] objectForKey:@"Content-Length"] intValue];
         }
     } else {
+        [self resetDownload];
         self.status = RDownloadTaskStatusFailed;
         if ([self.delegate respondsToSelector:@selector(downloadTask:didFailWithError:)]) {
             [self.delegate downloadTask:self didFailWithError:NULL];
@@ -257,9 +254,8 @@
 - (void)connection:(NSURLConnection *)connection didReceiveData:(NSData *)data
 {
     [self.cacheData appendData:data];
-    self.status = RDownloadTaskStatusDownloading;
     self.downloadedBytes += data.length;
-    if (_downloadedBytes >= _cacheSize) {
+    if (_cacheData.length >= _cacheSize) {
         [self writeCacheToFile];
     }
     if ([self.delegate respondsToSelector:@selector(downloadTaskDidReceiveData:)]) {
@@ -281,10 +277,75 @@
 
 - (void)connection:(NSURLConnection *)connection didFailWithError:(NSError *)error
 {
+    [self resetDownload];
     self.status = RDownloadTaskStatusFailed;
     if ([self.delegate respondsToSelector:@selector(downloadTask:didFailWithError:)]) {
         [self.delegate downloadTask:self didFailWithError:error];
     }
+}
+
+@end
+
+@interface RDownloadOperation()
+
+@property (nonatomic, strong) RDownloadTask *downloadTask;
+
+@end
+
+@implementation RDownloadOperation
+
+- (id)initWithDownloadTask:(RDownloadTask *)downloadTask
+{
+    self = [self init];
+    if (self) {
+        self.downloadTask = downloadTask;
+        self.downloadTask.operation = self;
+    }
+    return self;
+}
+
+#pragma mark - Concurrent operation override
+
+- (void)start
+{
+    if (self.isCancelled) {
+        return;
+    }
+    [self.downloadTask startDownload];
+    while (!self.isFinished) {
+        [[NSRunLoop currentRunLoop] runMode:NSDefaultRunLoopMode beforeDate:[NSDate distantFuture]];
+    }
+}
+
+- (void)cancel
+{
+    [self.downloadTask pauseDownload];
+}
+
+- (BOOL)isConcurrent
+{
+    return YES;
+}
+
+- (BOOL)isExecuting
+{
+    RDownloadTaskStatus status = self.downloadTask.status;
+    return (status == RDownloadTaskStatusDownloading);
+}
+
+- (BOOL)isFinished
+{
+    RDownloadTaskStatus status = self.downloadTask.status;
+    return (status == RDownloadTaskStatusPaused ||
+            status == RDownloadTaskStatusDownloaded ||
+            status == RDownloadTaskStatusFailed);
+}
+
+- (BOOL)isCancelled
+{
+    RDownloadTaskStatus status = self.downloadTask.status;
+    return (status == RDownloadTaskStatusPaused ||
+            status == RDownloadTaskStatusFailed);
 }
 
 @end
