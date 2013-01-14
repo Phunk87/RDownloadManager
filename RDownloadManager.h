@@ -14,7 +14,7 @@
 @property (nonatomic, strong) NSMutableArray *taskList;
 @property (nonatomic, assign) NSUInteger maxConcurrentDownloadTaskCount;
 
-+ (RDownloadManager *)shared;
++ (RDownloadManager *)sharedManager;
 - (void)addTask:(RDownloadTask *)task startImmediately:(BOOL)startImmediately;
 - (void)queueTask:(RDownloadTask *)task;
 - (void)stopTask:(RDownloadTask *)task;

@@ -153,12 +153,14 @@
 
 static RDownloadManager *sharedRDownloadManager = nil;
 
-+ (RDownloadManager *)shared
++ (RDownloadManager *)sharedManager
 {
-    if (!sharedRDownloadManager) {
+    static dispatch_once_t onceToken;
+    dispatch_once(&onceToken, ^{
         sharedRDownloadManager = [[RDownloadManager alloc] init];
         [sharedRDownloadManager readTaskList];
-    }
+    });
+    
     return sharedRDownloadManager;
 }
 
