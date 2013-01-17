@@ -18,7 +18,7 @@ task.cacheSize = 16 * 1024 * 1024; // Set cache size to 16MB (512KB as default)
 
 ### Control a task 对任务进行操作
 ```
-RDownloadManager *sharedDownloadManager = [RDownloadManager shared];
+RDownloadManager *sharedDownloadManager = [RDownloadManager sharedManager];
 sharedDownloadManager.maxConcurrentDownloadTaskCount = 5;
 [sharedDownloadManager addTask:task startImmediately:NO];
 [sharedDownloadManager queueTask:task];
